@@ -1,0 +1,5 @@
+package com.styliste.entity;
+
+public enum ServiceType {
+    STYLING_CONSULTATION, PERSONAL_SHOPPING, ALTERATIONS, VIRTUAL_CONSULTATION, IN_STORE_VISIT
+}
