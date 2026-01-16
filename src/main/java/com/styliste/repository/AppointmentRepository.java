@@ -18,5 +18,7 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
 
     List<Appointment> findByStatus(AppointmentStatus status);
 
+    List<Appointment> findByGuestEmail(String guestEmail);
+
     long countByStatus(AppointmentStatus status);
 }

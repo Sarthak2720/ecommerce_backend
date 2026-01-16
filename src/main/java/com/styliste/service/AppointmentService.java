@@ -85,6 +85,40 @@ public class AppointmentService {
         return mapToDTO(saved);
     }
 
+    @Transactional
+    public AppointmentDTO createGuestAppointment(CreateGuestAppointmentRequest request) {
+
+        if (request.getAppointmentDate().isBefore(LocalDate.now())) {
+            throw new BadRequestException("Appointment date cannot be in the past");
+        }
+
+        ServiceType serviceType;
+        try {
+            serviceType = ServiceType.valueOf(request.getServiceType().toUpperCase());
+        } catch (Exception e) {
+            throw new BadRequestException("Invalid service type");
+        }
+
+        Appointment appointment = Appointment.builder()
+                .guestName(request.getGuestName())
+                .guestEmail(request.getGuestEmail())
+                .guestPhone(request.getGuestPhone())
+                .appointmentDate(request.getAppointmentDate())
+                .appointmentTime(request.getAppointmentTime())
+                .serviceType(serviceType)
+                .notes(request.getNotes())
+                .status(AppointmentStatus.PENDING)
+                .build();
+
+        Appointment saved = appointmentRepository.save(appointment);
+
+        // 📧 Send email: "Request received"
+//        emailService.sendAppointmentPendingEmail(saved);
+
+        return mapToDTO(saved);
+    }
+
+
     public AppointmentDTO rejectAppointment(Long id) {
         Appointment appointment = appointmentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Appointment not found"));
@@ -101,6 +135,20 @@ public class AppointmentService {
 
         return mapToDTO(saved);
     }
+
+    @Transactional
+    public void linkAppointmentsToUser(User user) {
+
+        List<Appointment> appointments =
+                appointmentRepository.findByGuestEmail(user.getEmail());
+
+        for (Appointment appointment : appointments) {
+            appointment.setUser(user);
+        }
+
+        appointmentRepository.saveAll(appointments);
+    }
+
 
 
     public AppointmentDTO getAppointmentById(Long id) {

@@ -73,6 +73,7 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.GET, "/api/categories/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/products/search").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/appointments/types").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/appointments/guest").permitAll()
 
                         // 👇 3. THIS IS THE FIX: Allow access to uploaded images
                         .requestMatchers("/uploads/**").permitAll()

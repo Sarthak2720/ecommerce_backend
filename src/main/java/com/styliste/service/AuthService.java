@@ -6,6 +6,7 @@ import com.styliste.dto.SignUpRequest;
 import com.styliste.entity.User;
 import com.styliste.entity.UserRole;
 import com.styliste.exception.ResourceAlreadyExistsException;
+import com.styliste.repository.AppointmentRepository;
 import com.styliste.repository.UserRepository;
 import com.styliste.security.JwtTokenProvider;
 import lombok.extern.slf4j.Slf4j;
@@ -32,6 +33,9 @@ public class AuthService {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private AppointmentService appointmentService;
 
     @Value("${jwt.secret}")
     private String debugSecretKey;
@@ -79,6 +83,8 @@ public class AuthService {
 
             System.out.println("7. User found: " + user.getName() + " (ID: " + user.getId() + ")");
             System.out.println("========== LOGIN DEBUG END (SUCCESS) ==========");
+            appointmentService.linkAppointmentsToUser(user);
+
 
             return AuthResponse.builder()
                     .token(jwt)
@@ -122,10 +128,13 @@ public class AuthService {
 
         User savedUser = userRepository.save(user);
 
+
         // Generate JWT token
         String jwt = tokenProvider.generateTokenFromUsername(savedUser.getEmail());
 
         log.info("User registered successfully: {}", savedUser.getEmail());
+        appointmentService.linkAppointmentsToUser(savedUser);
+
 
         return AuthResponse.builder()
                 .token(jwt)

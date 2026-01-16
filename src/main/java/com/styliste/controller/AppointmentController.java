@@ -43,11 +43,13 @@ public class AppointmentController {
         AppointmentDTO dto = appointmentService.createAppointment(userId, request);
 
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(new ApiResponse<>(
-                        "Appointment request submitted. You will receive confirmation via email.",
-                        dto
-                ));
+                .body(ApiResponse.<AppointmentDTO>builder()
+                        .success(true)
+                        .message("Appointment request submitted. You will receive confirmation via email.")
+                        .data(dto)
+                        .build());
     }
+
 
     @PutMapping("/{id}/approve")
     @PreAuthorize("hasRole('ADMIN')")
@@ -61,6 +63,19 @@ public class AppointmentController {
         return ResponseEntity.ok(appointmentService.rejectAppointment(id));
     }
 
+    @PostMapping("/guest")
+    public ResponseEntity<ApiResponse<AppointmentDTO>> bookGuestAppointment(
+            @Valid @RequestBody CreateGuestAppointmentRequest request) {
+
+        AppointmentDTO dto = appointmentService.createGuestAppointment(request);
+
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.<AppointmentDTO>builder()
+                        .success(true)
+                        .message("Your appointment request has been received. You will get a confirmation email after admin approval.")
+                        .data(dto)
+                        .build());
+    }
 
 
     @GetMapping("/{id}")

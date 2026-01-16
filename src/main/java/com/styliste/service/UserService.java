@@ -1,8 +1,10 @@
 package com.styliste.service;
 
 import com.styliste.dto.UserDTO;
+import com.styliste.entity.Appointment;
 import com.styliste.entity.User;
 import com.styliste.entity.UserRole;
+import com.styliste.repository.AppointmentRepository;
 import com.styliste.repository.UserRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,6 +15,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 @Slf4j
 @Service
 @Transactional
@@ -20,6 +24,9 @@ public class UserService {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private AppointmentRepository appointmentRepository;
 
     // Inside UserService.java
 
@@ -64,6 +71,7 @@ public class UserService {
         // 4. Convert Entity back to DTO
         return mapToDTO(savedUser);
     }
+
 
     public void deleteUser(Long userId) {
         User user = userRepository.findById(userId)
