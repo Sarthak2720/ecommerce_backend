@@ -66,7 +66,7 @@ public class SecurityConfiguration {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)) // No sessions, use JWT
                 .authorizeHttpRequests(authz -> authz
                         // 1. PUBLIC ENDPOINTS (No Token Required)
-                        .requestMatchers("/", "/index.html", "/static/**", "/assets/**", "/favicon.ico").permitAll()
+                        .requestMatchers("/", "/index.html", "/static/**", "/assets/**", "/favicon.ico","/.well-known/**","/robots.txt").permitAll()
                         .requestMatchers("/{path:[^\\.]*}").permitAll()
                         .requestMatchers("/api/auth/**").permitAll() // Login & Signup
                         .requestMatchers(HttpMethod.GET, "/api/products/**").permitAll() // Anyone can VIEW products

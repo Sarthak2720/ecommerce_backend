@@ -31,6 +31,10 @@ public class AppointmentService {
     private AppointmentRepository appointmentRepository;
 
     @Autowired
+    private EmailService emailService;
+
+
+    @Autowired
     private UserRepository userRepository;
 
     public AppointmentDTO createAppointment(Long userId, CreateAppointmentRequest request) {
@@ -63,6 +67,41 @@ public class AppointmentService {
             throw new BadRequestException("Invalid service type: " + request.getServiceType());
         }
     }
+
+    public AppointmentDTO approveAppointment(Long id) {
+        Appointment appointment = appointmentRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Appointment not found"));
+
+        if (appointment.getStatus() != AppointmentStatus.PENDING) {
+            throw new BadRequestException("Only pending appointments can be approved");
+        }
+
+        appointment.setStatus(AppointmentStatus.CONFIRMED);
+        Appointment saved = appointmentRepository.save(appointment);
+
+        // 📧 email user
+        emailService.sendAppointmentApprovedEmail(saved);
+
+        return mapToDTO(saved);
+    }
+
+    public AppointmentDTO rejectAppointment(Long id) {
+        Appointment appointment = appointmentRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Appointment not found"));
+
+        if (appointment.getStatus() != AppointmentStatus.PENDING) {
+            throw new BadRequestException("Only pending appointments can be rejected");
+        }
+
+        appointment.setStatus(AppointmentStatus.CANCELLED);
+        Appointment saved = appointmentRepository.save(appointment);
+
+        // 📧 email user
+        emailService.sendAppointmentRejectedEmail(saved);
+
+        return mapToDTO(saved);
+    }
+
 
     public AppointmentDTO getAppointmentById(Long id) {
         log.debug("Fetching appointment with ID: {}", id);

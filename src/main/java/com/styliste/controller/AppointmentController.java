@@ -34,15 +34,34 @@ public class AppointmentController {
 
     @PostMapping
     @PreAuthorize("hasRole('CUSTOMER')")
-    public ResponseEntity<AppointmentDTO> createAppointment(
+    public ResponseEntity<ApiResponse<AppointmentDTO>> createAppointment(
             @Valid @RequestBody CreateAppointmentRequest request,
             Authentication authentication) {
-        log.info("Creating appointment for authenticated user");
 
         Long userId = extractUserIdFromAuth(authentication);
+
+        AppointmentDTO dto = appointmentService.createAppointment(userId, request);
+
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(appointmentService.createAppointment(userId, request));
+                .body(new ApiResponse<>(
+                        "Appointment request submitted. You will receive confirmation via email.",
+                        dto
+                ));
     }
+
+    @PutMapping("/{id}/approve")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<AppointmentDTO> approveAppointment(@PathVariable Long id) {
+        return ResponseEntity.ok(appointmentService.approveAppointment(id));
+    }
+
+    @PutMapping("/{id}/reject")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<AppointmentDTO> rejectAppointment(@PathVariable Long id) {
+        return ResponseEntity.ok(appointmentService.rejectAppointment(id));
+    }
+
+
 
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('CUSTOMER') or hasRole('ADMIN')") // 1. Role Check
