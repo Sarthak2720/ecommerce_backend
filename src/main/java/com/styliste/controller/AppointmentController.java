@@ -107,9 +107,13 @@ public class AppointmentController {
 
         // Step 3: The "Ownership" Check
         // If I am NOT an Admin AND the appointment is NOT mine...
-        if (!isAdmin && !appointment.getUserId().equals(currentUserId)) {
-            log.warn("User {} tried to access someone else's appointment {}", currentUserId, id);
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).build(); // 🛑 BLOCK THEM
+// If appointment belongs to a guest, only ADMIN can access
+        if (!isAdmin) {
+            if (appointment.getUserId() == null ||
+                    !appointment.getUserId().equals(currentUserId)) {
+
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            }
         }
 
         return ResponseEntity.ok(appointment);

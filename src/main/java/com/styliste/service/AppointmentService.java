@@ -261,10 +261,22 @@ public class AppointmentService {
     }
 
     private AppointmentDTO mapToDTO(Appointment appointment) {
+
+        boolean isGuest = appointment.getUser() == null;
+
         return AppointmentDTO.builder()
-                .name(appointment.getUser().getName())
                 .id(appointment.getId())
-                .userId(appointment.getUser().getId())
+
+                // ✅ Name: user OR guest
+                .name(isGuest
+                        ? appointment.getGuestName()
+                        : appointment.getUser().getName())
+
+                // ✅ userId: null for guest
+                .userId(isGuest
+                        ? null
+                        : appointment.getUser().getId())
+
                 .appointmentDate(appointment.getAppointmentDate())
                 .appointmentTime(appointment.getAppointmentTime())
                 .serviceType(appointment.getServiceType().name())
@@ -273,4 +285,5 @@ public class AppointmentService {
                 .createdAt(appointment.getCreatedAt())
                 .build();
     }
+
 }
