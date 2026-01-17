@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -83,6 +84,30 @@ public class AppointmentService {
         emailService.sendAppointmentApprovedEmail(saved);
 
         return mapToDTO(saved);
+    }
+
+    public List<LocalTime> getAvailableSlots(LocalDate date) {
+
+        // 🔹 Define all working slots (single source of truth)
+        List<LocalTime> allSlots = List.of(
+                LocalTime.of(10, 0),
+                LocalTime.of(11, 0),
+                LocalTime.of(12, 0),
+                LocalTime.of(14, 0),
+                LocalTime.of(15, 0),
+                LocalTime.of(16, 0),
+                LocalTime.of(17, 0),
+                LocalTime.of(18, 0)
+        );
+
+        // 🔹 Fetch already booked slots
+        List<LocalTime> bookedSlots =
+                appointmentRepository.findBookedSlotsByDate(date);
+
+        // 🔹 Remove booked ones
+        return allSlots.stream()
+                .filter(slot -> !bookedSlots.contains(slot))
+                .toList();
     }
 
     @Transactional

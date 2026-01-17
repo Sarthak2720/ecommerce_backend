@@ -18,6 +18,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.Arrays;
 import java.util.List;
 
@@ -49,6 +50,16 @@ public class AppointmentController {
                         .data(dto)
                         .build());
     }
+
+    @GetMapping("/available-slots")
+    public ResponseEntity<List<LocalTime>> getAvailableSlots(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+
+        return ResponseEntity.ok(
+                appointmentService.getAvailableSlots(date)
+        );
+    }
+
 
 
     @PutMapping("/{id}/approve")
