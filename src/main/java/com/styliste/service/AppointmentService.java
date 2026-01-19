@@ -82,12 +82,34 @@ public class AppointmentService {
 
         appointment.setStatus(AppointmentStatus.CONFIRMED);
         Appointment saved = appointmentRepository.save(appointment);
+        String recipientEmail = resolveRecipientEmail(appointment);
+        String recipientName  = resolveRecipientName(appointment);
 
         // 📧 email user
-        emailService.sendAppointmentApprovedEmail(saved);
+        emailService.sendAppointmentApprovedEmail(
+                recipientEmail,
+                recipientName,
+                appointment.getAppointmentDate().toString(),
+                appointment.getAppointmentTime().toString(),
+                appointment.getServiceType().name()
+        );
 
         return mapToDTO(saved);
     }
+    private String resolveRecipientEmail(Appointment appointment) {
+        if (appointment.getUser() != null) {
+            return appointment.getUser().getEmail();
+        }
+        return appointment.getGuestEmail();
+    }
+
+    private String resolveRecipientName(Appointment appointment) {
+        if (appointment.getUser() != null) {
+            return appointment.getUser().getName();
+        }
+        return appointment.getGuestName();
+    }
+
 
     public List<LocalTime> getAvailableSlots(LocalDate date) {
 
@@ -157,9 +179,14 @@ public class AppointmentService {
 
         appointment.setStatus(AppointmentStatus.CANCELLED);
         Appointment saved = appointmentRepository.save(appointment);
+        String recipientEmail = resolveRecipientEmail(appointment);
+        String recipientName  = resolveRecipientName(appointment);
 
         // 📧 email user
-        emailService.sendAppointmentRejectedEmail(saved);
+        emailService.sendAppointmentRejectedEmail(
+                recipientEmail,
+                recipientName
+        );
 
         return mapToDTO(saved);
     }

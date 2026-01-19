@@ -1,8 +1,22 @@
 package com.styliste.service;
 
 import com.styliste.entity.Appointment;
+import org.springframework.scheduling.annotation.Async;
 
 public interface EmailService {
-    void sendAppointmentApprovedEmail(Appointment appointment);
-    void sendAppointmentRejectedEmail(Appointment appointment);
+
+    @Async
+    void sendAppointmentApprovedEmail(
+            String email,
+            String name,
+            String appointmentDate,
+            String appointmentTime,
+            String serviceName
+    );
+
+    @Async
+    void sendAppointmentRejectedEmail(
+            String email,
+            String name
+    );
 }
