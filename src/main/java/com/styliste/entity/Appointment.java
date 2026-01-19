@@ -69,13 +69,13 @@ public class Appointment {
     private User user;
 
     // 🔹 Guest details (MANDATORY)
-    @Column(nullable = false)
+    @Column(nullable = true)
     private String guestName;
 
-    @Column(nullable = false)
+    @Column(nullable = true)
     private String guestEmail;
 
-    @Column(nullable = false)
+    @Column(nullable = true)
     private String guestPhone;
 
     @Column(nullable = false)

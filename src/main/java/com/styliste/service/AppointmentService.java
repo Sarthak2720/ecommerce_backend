@@ -53,6 +53,9 @@ public class AppointmentService {
 
             Appointment appointment = Appointment.builder()
                     .user(user)
+                    .guestName(user.getName())
+                    .guestEmail(user.getEmail())
+                    .guestPhone(user.getPhone())
                     .appointmentDate(request.getAppointmentDate())
                     .appointmentTime(request.getAppointmentTime())
                     .serviceType(serviceType)
