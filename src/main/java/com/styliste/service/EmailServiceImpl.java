@@ -8,9 +8,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
-import org.springframework.stereotype.Service;
 import org.springframework.scheduling.annotation.Async;
-
+import org.springframework.stereotype.Service;
 
 @Slf4j
 @Service
@@ -22,18 +21,20 @@ public class EmailServiceImpl implements EmailService {
     @Value("${spring.mail.username}")
     private String fromEmail;
 
+    // ================= APPROVED =================
+
     @Override
     @Async
     public void sendAppointmentApprovedEmail(Appointment appointment) {
         String subject = "✅ Appointment Confirmed";
         String body = buildApprovalEmail(appointment);
 
-        sendEmail(
-                appointment.getUser().getEmail(),
-                subject,
-                body
-        );
+        String recipientEmail = resolveRecipientEmail(appointment);
+
+        sendEmail(recipientEmail, subject, body);
     }
+
+    // ================= REJECTED =================
 
     @Override
     @Async
@@ -41,37 +42,53 @@ public class EmailServiceImpl implements EmailService {
         String subject = "❌ Appointment Request Rejected";
         String body = buildRejectionEmail(appointment);
 
-        sendEmail(
-                appointment.getUser().getEmail(),
-                subject,
-                body
-        );
+        String recipientEmail = resolveRecipientEmail(appointment);
+
+        sendEmail(recipientEmail, subject, body);
     }
 
-    // ------------------ CORE MAIL SENDER ------------------
+    // ================= CORE MAIL =================
 
     private void sendEmail(String to, String subject, String htmlBody) {
         try {
             MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            MimeMessageHelper helper =
+                    new MimeMessageHelper(message, true, "UTF-8");
 
             helper.setFrom(fromEmail);
             helper.setTo(to);
             helper.setSubject(subject);
-            helper.setText(htmlBody, true); // true = HTML
+            helper.setText(htmlBody, true); // HTML enabled
 
             mailSender.send(message);
             log.info("Email sent successfully to {}", to);
 
         } catch (MessagingException e) {
             log.error("Failed to send email to {}", to, e);
-            // DO NOT throw exception → appointment flow should not break
+            // DO NOT throw → async failure must not break flow
         }
     }
 
-    // ------------------ EMAIL TEMPLATES ------------------
+    // ================= EMAIL HELPERS =================
+
+    private String resolveRecipientEmail(Appointment appointment) {
+        return appointment.getUser() != null
+                ? appointment.getUser().getEmail()
+                : appointment.getGuestEmail();
+    }
+
+    private String resolveRecipientName(Appointment appointment) {
+        return appointment.getUser() != null
+                ? appointment.getUser().getName()
+                : appointment.getGuestName();
+    }
+
+    // ================= TEMPLATES =================
 
     private String buildApprovalEmail(Appointment appointment) {
+
+        String name = resolveRecipientName(appointment);
+
         return """
             <html>
                 <body style="font-family:Arial,sans-serif;">
@@ -89,7 +106,7 @@ public class EmailServiceImpl implements EmailService {
                 </body>
             </html>
         """.formatted(
-                appointment.getUser().getName(),
+                name,
                 appointment.getAppointmentDate(),
                 appointment.getAppointmentTime(),
                 appointment.getServiceType().name()
@@ -97,6 +114,9 @@ public class EmailServiceImpl implements EmailService {
     }
 
     private String buildRejectionEmail(Appointment appointment) {
+
+        String name = resolveRecipientName(appointment);
+
         return """
             <html>
                 <body style="font-family:Arial,sans-serif;">
@@ -109,8 +129,6 @@ public class EmailServiceImpl implements EmailService {
                     <p>Regards,<br/><b>Styliste Team</b></p>
                 </body>
             </html>
-        """.formatted(
-                appointment.getUser().getName()
-        );
+        """.formatted(name);
     }
 }
