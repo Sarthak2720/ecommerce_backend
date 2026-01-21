@@ -26,9 +26,16 @@ public class WebConfig implements WebMvcConfigurer {
 
     @Override
     public void addViewControllers(ViewControllerRegistry registry) {
-        // This regex matches any path that does not contain a dot (to avoid matching files like .js or .css)
-        // and forwards it to index.html so your React/Vite router can take over.
+        // Level 1: matches /shop, /login
         registry.addViewController("/{path:[^\\.]*}")
+                .setViewName("forward:/index.html");
+
+        // Level 2: matches /admin/products, /user/profile
+        registry.addViewController("/{path1:[^\\.]*}/{path2:[^\\.]*}")
+                .setViewName("forward:/index.html");
+
+        // Level 3: matches /admin/orders/details
+        registry.addViewController("/{path1:[^\\.]*}/{path2:[^\\.]*}/{path3:[^\\.]*}")
                 .setViewName("forward:/index.html");
     }
 }

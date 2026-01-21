@@ -39,6 +39,12 @@ public class CategoryController {
         return ResponseEntity.ok(categoryService.createCategory(name, desc));
     }
 
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Category> updateCategory(@PathVariable Long id, @RequestBody Map<String, String> payload) {
+        return ResponseEntity.ok(categoryService.updateCategory(id, payload.get("name"), payload.get("description")));
+    }
+
     // Admin Only: Delete Category
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
@@ -59,6 +65,12 @@ public class CategoryController {
 
         // 3. Call the Service
         return ResponseEntity.ok(categoryService.createSubCategory(categoryId, name, desc));
+    }
+
+    @PutMapping("/subcategories/{subId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<SubCategory> updateSubCategory(@PathVariable Long subId, @RequestBody Map<String, String> payload) {
+        return ResponseEntity.ok(categoryService.updateSubCategory(subId, payload.get("name"), payload.get("description")));
     }
 
     // Admin Only: Delete SubCategory

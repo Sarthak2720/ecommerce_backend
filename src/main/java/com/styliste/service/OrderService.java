@@ -196,16 +196,28 @@ public class OrderService {
 
     private OrderDTO mapToDTO(Order order) {
         List<OrderItemDTO> items = order.getItems().stream()
-                .map(item -> OrderItemDTO.builder()
-                        .id(item.getId())
-                        .productId(item.getProduct().getId())
-                        .productName(item.getProduct().getName())
-                        .quantity(item.getQuantity())
-                        .unitPrice(item.getUnitPrice())
-                        .totalPrice(item.getTotalPrice())
-                        .selectedSize(item.getSelectedSize())
-                        .selectedColor(item.getSelectedColor())
-                        .build())
+                .map(item -> {
+                    // Safely get the product and its image list
+                    Product product = item.getProduct();
+                    List<String> productImages = product.getImages();
+
+                    // Extract the first image URL if it exists
+                    String firstImageUrl = (productImages != null && !productImages.isEmpty())
+                            ? productImages.get(0)
+                            : null;
+
+                    return OrderItemDTO.builder()
+                            .id(item.getId())
+                            .productId(product.getId())
+                            .productName(product.getName())
+                            .productImage(firstImageUrl) // 👈 Updated to handle List<String>
+                            .quantity(item.getQuantity())
+                            .unitPrice(item.getUnitPrice())
+                            .totalPrice(item.getTotalPrice())
+                            .selectedSize(item.getSelectedSize())
+                            .selectedColor(item.getSelectedColor())
+                            .build();
+                })
                 .collect(Collectors.toList());
 
         return OrderDTO.builder()

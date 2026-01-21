@@ -11,6 +11,7 @@ public class OrderItemDTO {
     private Long id;
     private Long productId;
     private String productName;
+    private String productImage; // 👈 Add this field
     private Integer quantity;
     private BigDecimal unitPrice;
     private BigDecimal totalPrice;
