@@ -12,40 +12,98 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.UUID;
+//
+//@Service
+//public class FileStorageService {
+//
+//    @Value("${file.upload-dir}")
+//    private String uploadDir;
+//
+//    @Value("${file.video-dir}")
+//    private String videoDir;
+//
+//    @PostConstruct
+//    public void init() {
+//        try {
+//            Files.createDirectories(Paths.get(uploadDir));
+//        } catch (IOException e) {
+//            throw new RuntimeException("Could not create upload folder!");
+//        }
+//    }
+//
+//    public String saveFile(MultipartFile file) {
+//        try {
+//            String fileName = UUID.randomUUID().toString() + "_" + file.getOriginalFilename();
+//            Path root = Paths.get(uploadDir);
+//            Path resolve = root.resolve(fileName);
+//            if (!resolve.getParent().equals(root.toAbsolutePath())) {
+//                // Security check
+//                try (InputStream inputStream = file.getInputStream()) {
+//                    Files.copy(inputStream, resolve, StandardCopyOption.REPLACE_EXISTING);
+//                }
+//            } else {
+//                // Simplified for typical usage
+//                Files.copy(file.getInputStream(), resolve, StandardCopyOption.REPLACE_EXISTING);
+//            }
+//            // Return the URL path that matches WebConfig
+//            return "/uploads/" + fileName;
+//        } catch (Exception e) {
+//            throw new RuntimeException("Could not store the file. Error: " + e.getMessage());
+//        }
+//    }
+//}
 
 @Service
 public class FileStorageService {
 
     @Value("${file.upload-dir}")
-    private String uploadDir;
+    private String uploadDir; // uploads/images
+
+    @Value("${file.video-dir}")
+    private String videoDir;   // uploads/videos
 
     @PostConstruct
     public void init() {
         try {
             Files.createDirectories(Paths.get(uploadDir));
+            Files.createDirectories(Paths.get(videoDir));
         } catch (IOException e) {
-            throw new RuntimeException("Could not create upload folder!");
+            throw new RuntimeException("Could not create upload folders!");
         }
     }
 
-    public String saveFile(MultipartFile file) {
+    public String saveFile(MultipartFile file, String type) {
         try {
+            // 1. Determine which root folder to use
+            String targetDir = type.equalsIgnoreCase("video") ? videoDir : uploadDir;
+            Path root = Paths.get(targetDir);
+
+            // 2. Generate a unique filename
             String fileName = UUID.randomUUID().toString() + "_" + file.getOriginalFilename();
-            Path root = Paths.get(uploadDir);
-            Path resolve = root.resolve(fileName);
-            if (!resolve.getParent().equals(root.toAbsolutePath())) {
-                // Security check
-                try (InputStream inputStream = file.getInputStream()) {
-                    Files.copy(inputStream, resolve, StandardCopyOption.REPLACE_EXISTING);
-                }
-            } else {
-                // Simplified for typical usage
-                Files.copy(file.getInputStream(), resolve, StandardCopyOption.REPLACE_EXISTING);
+
+            // 3. IMPORTANT: Resolve the path (This is what you mentioned)
+            Path destinationFile = root.resolve(fileName)
+                    .normalize()
+                    .toAbsolutePath();
+
+            // 4. Security Check: Ensure the file is actually inside the intended folder
+            if (!destinationFile.getParent().equals(root.toAbsolutePath())) {
+                throw new RuntimeException("Cannot store file outside current directory.");
             }
-            // Return the URL path that matches WebConfig
-            return "/uploads/" + fileName;
+
+            // 5. Store the file
+            try (InputStream inputStream = file.getInputStream()) {
+                Files.copy(inputStream, destinationFile, StandardCopyOption.REPLACE_EXISTING);
+            }
+
+            // 6. Return the URL path for the database
+            // Note: We return "/uploads/images/..." or "/uploads/videos/..."
+            // to match your WebConfig.java ResourceHandlers
+            String subFolder = type.equalsIgnoreCase("video") ? "videos/" : "images/";
+            return "/uploads/" + subFolder + fileName;
+
         } catch (Exception e) {
-            throw new RuntimeException("Could not store the file. Error: " + e.getMessage());
+            throw new RuntimeException("Could not store " + type + ". Error: " + e.getMessage());
         }
     }
 }

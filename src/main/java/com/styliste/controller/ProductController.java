@@ -29,27 +29,59 @@ public class ProductController {
     @Autowired
     private FileStorageService fileStorageService;
 
-    @PostMapping(consumes = { MediaType.MULTIPART_FORM_DATA_VALUE }) // 👈 Tell Spring this is a File Upload
+//    @PostMapping(consumes = { MediaType.MULTIPART_FORM_DATA_VALUE }) // 👈 Tell Spring this is a File Upload
+//    @PreAuthorize("hasRole('ADMIN')")
+//    public ResponseEntity<ProductDTO> createProduct(
+//            @RequestPart("product") @Valid CreateProductRequest request, // 👈 Look for the "product" part
+//            @RequestPart(value = "imageFiles", required = false) List<MultipartFile> imageFiles // 👈 Look for the files
+//    ) {
+//        log.info("Creating new product with {} images", imageFiles != null ? imageFiles.size() : 0);
+//
+//        // 1. Save files to disk and get their paths
+//        List<String> savedImagePaths = new ArrayList<>();
+//        if (imageFiles != null) {
+//            for (MultipartFile file : imageFiles) {
+//                String path = fileStorageService.saveFile(file); // From the FileStorageService we created
+//                savedImagePaths.add(path);
+//            }
+//        }
+//
+//        // 2. Set the generated paths into the request object
+//        request.setImages(savedImagePaths);
+//
+//        // 3. Pass to service as usual
+//        return ResponseEntity.status(HttpStatus.CREATED).body(productService.createProduct(request));
+//    }
+
+    @PostMapping(consumes = { MediaType.MULTIPART_FORM_DATA_VALUE })
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ProductDTO> createProduct(
-            @RequestPart("product") @Valid CreateProductRequest request, // 👈 Look for the "product" part
-            @RequestPart(value = "imageFiles", required = false) List<MultipartFile> imageFiles // 👈 Look for the files
+            @RequestPart("product") @Valid CreateProductRequest request,
+            @RequestPart(value = "imageFiles", required = false) List<MultipartFile> imageFiles,
+            @RequestPart(value = "videoFiles", required = false) List<MultipartFile> videoFiles // 👈 Added video part
     ) {
-        log.info("Creating new product with {} images", imageFiles != null ? imageFiles.size() : 0);
+        log.info("Creating product with {} images and {} videos",
+                imageFiles != null ? imageFiles.size() : 0,
+                videoFiles != null ? videoFiles.size() : 0);
 
-        // 1. Save files to disk and get their paths
+        // 1. Process Images
         List<String> savedImagePaths = new ArrayList<>();
         if (imageFiles != null) {
             for (MultipartFile file : imageFiles) {
-                String path = fileStorageService.saveFile(file); // From the FileStorageService we created
-                savedImagePaths.add(path);
+                savedImagePaths.add(fileStorageService.saveFile(file, "image"));
             }
         }
-
-        // 2. Set the generated paths into the request object
         request.setImages(savedImagePaths);
 
-        // 3. Pass to service as usual
+        // 2. Process Videos
+        List<String> savedVideoPaths = new ArrayList<>();
+        if (videoFiles != null) {
+            for (MultipartFile file : videoFiles) {
+                savedVideoPaths.add(fileStorageService.saveFile(file, "video")); // 👈 Save to video folder
+            }
+        }
+        request.setVideos(savedVideoPaths);
+
         return ResponseEntity.status(HttpStatus.CREATED).body(productService.createProduct(request));
     }
 
