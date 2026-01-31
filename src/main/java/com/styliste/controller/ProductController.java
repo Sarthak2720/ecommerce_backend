@@ -1,6 +1,8 @@
 package com.styliste.controller;
 
 import com.styliste.dto.*;
+import com.styliste.entity.Attribute;
+import com.styliste.repository.AttributeRepository;
 import com.styliste.service.FileStorageService;
 import com.styliste.service.ProductService;
 import jakarta.validation.Valid;
@@ -16,6 +18,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Slf4j
 @RestController
@@ -29,29 +33,8 @@ public class ProductController {
     @Autowired
     private FileStorageService fileStorageService;
 
-//    @PostMapping(consumes = { MediaType.MULTIPART_FORM_DATA_VALUE }) // 👈 Tell Spring this is a File Upload
-//    @PreAuthorize("hasRole('ADMIN')")
-//    public ResponseEntity<ProductDTO> createProduct(
-//            @RequestPart("product") @Valid CreateProductRequest request, // 👈 Look for the "product" part
-//            @RequestPart(value = "imageFiles", required = false) List<MultipartFile> imageFiles // 👈 Look for the files
-//    ) {
-//        log.info("Creating new product with {} images", imageFiles != null ? imageFiles.size() : 0);
-//
-//        // 1. Save files to disk and get their paths
-//        List<String> savedImagePaths = new ArrayList<>();
-//        if (imageFiles != null) {
-//            for (MultipartFile file : imageFiles) {
-//                String path = fileStorageService.saveFile(file); // From the FileStorageService we created
-//                savedImagePaths.add(path);
-//            }
-//        }
-//
-//        // 2. Set the generated paths into the request object
-//        request.setImages(savedImagePaths);
-//
-//        // 3. Pass to service as usual
-//        return ResponseEntity.status(HttpStatus.CREATED).body(productService.createProduct(request));
-//    }
+    @Autowired
+    private AttributeRepository attributeRepository;
 
     @PostMapping(consumes = { MediaType.MULTIPART_FORM_DATA_VALUE })
     @PreAuthorize("hasRole('ADMIN')")
@@ -85,18 +68,47 @@ public class ProductController {
         return ResponseEntity.status(HttpStatus.CREATED).body(productService.createProduct(request));
     }
 
+
+    @GetMapping("/filters")
+    public ResponseEntity<Map<String, List<String>>> getFilters() {
+        return ResponseEntity.ok(productService.getProductFilters());
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<ProductDTO> getProductById(@PathVariable Long id) {
         log.info("Fetching product with ID: {}", id);
         return ResponseEntity.ok(productService.getProductById(id));
     }
 
-    @PutMapping("/{id}")
+    @PutMapping(value = "/{id}", consumes = { MediaType.MULTIPART_FORM_DATA_VALUE })
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ProductDTO> updateProduct(
             @PathVariable Long id,
-            @Valid @RequestBody UpdateProductRequest request) {
-        log.info("Updating product with ID: {}", id);
+            @RequestPart("product") @Valid UpdateProductRequest request, // Use @RequestPart
+            @RequestPart(value = "imageFiles", required = false) List<MultipartFile> imageFiles,
+            @RequestPart(value = "videoFiles", required = false) List<MultipartFile> videoFiles
+    ) {
+        // 1. Process new images
+        List<String> newImagePaths = new ArrayList<>();
+        if (imageFiles != null) {
+            for (MultipartFile file : imageFiles) {
+                newImagePaths.add(fileStorageService.saveFile(file, "image"));
+            }
+        }
+        // Add new images to the existing images list sent from frontend
+        if (request.getImages() == null) request.setImages(new ArrayList<>());
+        request.getImages().addAll(newImagePaths);
+
+        // 2. Process new videos
+        List<String> newVideoPaths = new ArrayList<>();
+        if (videoFiles != null) {
+            for (MultipartFile file : videoFiles) {
+                newVideoPaths.add(fileStorageService.saveFile(file, "video"));
+            }
+        }
+        if (request.getVideos() == null) request.setVideos(new ArrayList<>());
+        request.getVideos().addAll(newVideoPaths);
+
         return ResponseEntity.ok(productService.updateProduct(id, request));
     }
 

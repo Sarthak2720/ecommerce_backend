@@ -21,7 +21,7 @@ public class Product {
     @Column(nullable = false, length = 200)
     private String name;
 
-    @Column(columnDefinition = "TEXT")
+    @Column(name = "description", columnDefinition = "MEDIUMTEXT") // 👈 Changed to MEDIUMTEXT
     private String description;
 
     @Column(nullable = false, precision = 10, scale = 2)
@@ -49,9 +49,13 @@ public class Product {
     @Column(name = "video_url", columnDefinition = "TEXT")
     private List<String> videos;
 
-    @ElementCollection(fetch = FetchType.EAGER)
-    @CollectionTable(name = "product_attributes", joinColumns = @JoinColumn(name = "product_id"))
-    private List<ProductAttribute> attributes;
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+            name = "product_attribute_mapping",
+            joinColumns = @JoinColumn(name = "product_id"),
+            inverseJoinColumns = @JoinColumn(name = "attribute_id")
+    )
+    private List<Attribute> attributes;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

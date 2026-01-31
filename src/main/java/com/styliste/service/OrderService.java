@@ -36,21 +36,33 @@ public class OrderService {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private  OrderTimelineRepository timelineRepository;
+
     public OrderDTO createOrder(Long userId, CreateOrderRequest request) {
-        log.info("Creating order for user: {}", userId);
-
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + userId));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        if (request.getItems().isEmpty()) {
-            throw new BadRequestException("Order must contain at least one item");
-        }
+        // 1. Extract the specific address the user chose for this order
+        AddressDTO addr = request.getShippingAddress();
 
+        // 2. Format the address string for the snapshot
+        String addressSnapshot = String.format("%s, %s, %s, %s - %s, %s",
+                addr.getAddressLine1(),
+                addr.getAddressLine2() != null ? addr.getAddressLine2() : "",
+                addr.getCity(),
+                addr.getState(),
+                addr.getPostalCode(),
+                addr.getCountry());
+
+        // 3. Build the order using the Snapshot data
         Order order = Order.builder()
                 .user(user)
                 .status(OrderStatus.PENDING)
                 .paymentStatus(PaymentStatus.PENDING)
-                .shippingAddress(request.getShippingAddress())
+                .shippingAddress(addressSnapshot) // The full text address
+                .userPhone(addr.getContactPhone()) // 👈 This will now work!
+                .totalAmount(BigDecimal.ZERO)      // Will be updated below
                 .build();
 
         BigDecimal totalAmount = BigDecimal.ZERO;
@@ -60,6 +72,10 @@ public class OrderService {
             Product product = productRepository.findById(cartItem.getProductId())
                     .orElseThrow(() -> new ResourceNotFoundException(
                             "Product not found with ID: " + cartItem.getProductId()));
+
+            if (product.getStock() <= 0) {
+                throw new BadRequestException("The item '" + product.getName() + "' is sold out. Please remove it from your cart.");
+            }
 
             if (product.getStock() < cartItem.getQuantity()) {
                 throw new BadRequestException("Insufficient stock for product: " + product.getName());
@@ -83,12 +99,14 @@ public class OrderService {
             totalAmount = totalAmount.add(itemTotal);
 
             // Reduce stock
+
             product.setStock(product.getStock() - cartItem.getQuantity());
             productRepository.save(product);
         }
 
         order.setItems(orderItems);
         order.setTotalAmount(totalAmount);
+        order.addTimelineStep(OrderStatus.PENDING, "Order placed successfully.");
 
         Order savedOrder = orderRepository.save(order);
         log.info("Order created with ID: {}", savedOrder.getId());
@@ -103,26 +121,67 @@ public class OrderService {
         return mapToDTO(order);
     }
 
+    @Transactional
     public OrderDTO updateOrderStatus(Long id, UpdateOrderStatusRequest request) {
-        log.info("Updating order status for ID: {}", id);
-
         Order order = orderRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Order not found with ID: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Order not found"));
 
         try {
-            OrderStatus newStatus = OrderStatus.valueOf(request.getStatus().toUpperCase());
-            order.setStatus(newStatus);
+            String formattedStatus = request.getStatus().trim().toUpperCase();
+            OrderStatus newStatus = OrderStatus.valueOf(formattedStatus);
+//            OrderStatus newStatus = OrderStatus.valueOf(request.getStatus().toUpperCase());
 
+            // 1. Update Tracking Number if provided
             if (request.getTrackingNumber() != null) {
                 order.setTrackingNumber(request.getTrackingNumber());
             }
+
+            // 2. Add to Timeline with a professional message
+            String message = (request.getTimelineMessage() != null)
+                    ? request.getTimelineMessage()
+                    : getDefaultMessage(newStatus);
+
+            order.addTimelineStep(newStatus, message);
+
         } catch (IllegalArgumentException ex) {
-            throw new BadRequestException("Invalid order status: " + request.getStatus());
+            throw new BadRequestException("Invalid status: " + request.getStatus());
         }
 
-        Order updatedOrder = orderRepository.save(order);
-        log.info("Order status updated successfully");
-        return mapToDTO(updatedOrder);
+        return mapToDTO(orderRepository.save(order));
+    }
+
+    public List<OrderTimelineDTO> getOrderTimeline(Long orderId) {
+        // Check if order exists first to return a proper error if it doesn't
+        if (!orderRepository.existsById(orderId)) {
+            throw new ResourceNotFoundException("Order not found with ID: " + orderId);
+        }
+
+        List<OrderTimeline> timeline = timelineRepository.findByOrderIdOrderByTimestampAsc(orderId);
+
+        return timeline.stream()
+                .map(this::mapToTimelineDTO)
+                .collect(Collectors.toList());
+    }
+
+    private OrderTimelineDTO mapToTimelineDTO(OrderTimeline entity) {
+        return OrderTimelineDTO.builder()
+                .status(entity.getStatus().name())
+                .message(entity.getMessage())
+                .timestamp(entity.getTimestamp())
+                .build();
+    }
+
+    private String getDefaultMessage(OrderStatus status) {
+        return switch (status) {
+            case PENDING -> "Order placed successfully.";
+            case PROCESSING -> "Your order is under proceeding from seller side by the seller.";
+            case SHIPPED -> "Item has been dispatched.";
+            case OUT_FOR_DELIVERY -> "Our delivery partner is on the way to your location!";
+            case DELIVERED -> "Package delivered successfully.";
+            case CANCELLED -> "Order was cancelled.";
+            case RETURNED -> "Order got returned to the seller";
+            default -> "Order status updated to " + status;
+        };
     }
 
     public void updatePaymentStatus(Long id, String paymentStatus) {
@@ -223,6 +282,9 @@ public class OrderService {
         return OrderDTO.builder()
                 .id(order.getId())
                 .userId(order.getUser().getId())
+                .userName(order.getUser().getName())
+                .userEmail(order.getUser().getEmail())
+                .userPhone(order.getUser().getPhone())
                 .status(order.getStatus().name())
                 .paymentStatus(order.getPaymentStatus().name())
                 .totalAmount(order.getTotalAmount())

@@ -19,6 +19,8 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
     List<Product> findByCategoryAndSubcategory(String category, String subcategory);
 
+    boolean existsBySubcategory(String subcategoryName);
+
     Page<Product> findByNameContainingIgnoreCase(String name, Pageable pageable);
 
     @Query("SELECT p FROM Product p WHERE " +

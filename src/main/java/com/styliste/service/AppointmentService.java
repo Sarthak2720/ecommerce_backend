@@ -1,12 +1,10 @@
 package com.styliste.service;
 
 import com.styliste.dto.*;
-import com.styliste.entity.Appointment;
-import com.styliste.entity.AppointmentStatus;
-import com.styliste.entity.ServiceType;
-import com.styliste.entity.User;
+import com.styliste.entity.*;
 import com.styliste.exception.BadRequestException;
 import com.styliste.exception.ResourceNotFoundException;
+import com.styliste.repository.AdminAvailabilityRepository;
 import com.styliste.repository.AppointmentRepository;
 import com.styliste.repository.UserRepository;
 import lombok.extern.slf4j.Slf4j;
@@ -33,6 +31,9 @@ public class AppointmentService {
 
     @Autowired
     private EmailService emailService;
+
+    @Autowired
+    private AdminAvailabilityRepository availabilityRepository;
 
 
     @Autowired
@@ -111,9 +112,10 @@ public class AppointmentService {
     }
 
 
-    public List<LocalTime> getAvailableSlots(LocalDate date) {
+    // Add this method to AppointmentService
 
-        // 🔹 Define all working slots (single source of truth)
+    public List<LocalTime> getAvailableSlots(LocalDate date) {
+        // Define all working slots
         List<LocalTime> allSlots = List.of(
                 LocalTime.of(10, 0),
                 LocalTime.of(11, 0),
@@ -125,14 +127,31 @@ public class AppointmentService {
                 LocalTime.of(18, 0)
         );
 
-        // 🔹 Fetch already booked slots
-        List<LocalTime> bookedSlots =
-                appointmentRepository.findBookedSlotsByDate(date);
+        // Fetch already booked slots
+        List<LocalTime> bookedSlots = appointmentRepository.findBookedSlotsByDate(date);
 
-        // 🔹 Remove booked ones
+        // ✅ NEW: Fetch admin unavailability
+        List<AdminAvailability> blocks = availabilityRepository.findByBlockedDate(date);
+
         return allSlots.stream()
                 .filter(slot -> !bookedSlots.contains(slot))
-                .toList();
+                .filter(slot -> {
+                    // Check if slot is blocked by admin
+                    for (AdminAvailability block : blocks) {
+                        // Full day blocked
+                        if (block.getIsFullDayBlocked()) {
+                            return false;
+                        }
+
+                        // Time slot blocked
+                        if (!slot.isBefore(block.getBlockedTimeStart())
+                                && slot.isBefore(block.getBlockedTimeEnd())) {
+                            return false;
+                        }
+                    }
+                    return true;
+                })
+                .collect(Collectors.toList());
     }
 
     @Transactional

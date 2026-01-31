@@ -1,11 +1,17 @@
 package com.styliste.controller;
 
+import com.razorpay.RazorpayException;
 import com.styliste.dto.*;
+import com.styliste.entity.Order;
 import com.styliste.entity.OrderStatus;
+import com.styliste.entity.PaymentStatus;
 import com.styliste.entity.User;
+import com.styliste.exception.BadRequestException;
 import com.styliste.exception.ResourceNotFoundException;
+import com.styliste.repository.OrderRepository;
 import com.styliste.repository.UserRepository;
 import com.styliste.service.OrderService;
+import com.styliste.service.RazorpayService;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,6 +22,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @RestController
@@ -28,6 +35,13 @@ public class OrderController {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private OrderRepository orderRepository;
+
+    @Autowired
+    private RazorpayService razorpayService;
+
 
     @PostMapping
     @PreAuthorize("hasRole('CUSTOMER')")
@@ -49,13 +63,58 @@ public class OrderController {
         return ResponseEntity.ok(orderService.getOrderById(id));
     }
 
-    @PutMapping("/{id}/status")
+    @PatchMapping("/{id}/status")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<OrderDTO> updateOrderStatus(
             @PathVariable Long id,
             @Valid @RequestBody UpdateOrderStatusRequest request) {
         log.info("Updating order status for ID: {}", id);
         return ResponseEntity.ok(orderService.updateOrderStatus(id, request));
+    }
+
+    @GetMapping("/{orderId}/timeline")
+    public ResponseEntity<List<OrderTimelineDTO>> getTimeline(@PathVariable Long orderId) {
+        log.info("Fetching timeline for order ID: {}", orderId);
+        return ResponseEntity.ok(orderService.getOrderTimeline(orderId));
+    }
+
+    @PostMapping("/{orderId}/pay")
+    public ResponseEntity<?> initiatePayment(@PathVariable Long orderId) throws RazorpayException {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Order not found"));
+
+        if (order.getPaymentStatus() != PaymentStatus.PENDING) {
+            throw new BadRequestException("Payment already processed");
+        }
+
+        String razorpayOrderId = razorpayService.createRazorpayOrder(order);
+
+        return ResponseEntity.ok(Map.of(
+                "razorpayOrderId", razorpayOrderId,
+                "amount", order.getTotalAmount(),
+                "currency", "INR"
+        ));
+    }
+
+    @PostMapping("/{orderId}/verify-payment")
+    @PreAuthorize("hasRole('CUSTOMER')")
+    public ResponseEntity<?> verifyPayment(
+            @PathVariable Long orderId,
+            @Valid @RequestBody PaymentVerificationRequest request) {
+
+        razorpayService.verifyPayment(orderId, request);
+
+        return ResponseEntity.ok(Map.of(
+                "message", "Payment verified successfully"
+        ));
+    }
+    @PostMapping("/webhook/razorpay")
+    public ResponseEntity<String> handleWebhook(
+            @RequestBody String payload,
+            @RequestHeader("X-Razorpay-Signature") String signature) {
+
+        razorpayService.handleWebhook(payload, signature);
+        return ResponseEntity.ok("OK");
     }
 
     @GetMapping("/user/{userId}")

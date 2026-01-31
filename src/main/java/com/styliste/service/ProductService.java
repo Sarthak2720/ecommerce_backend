@@ -1,10 +1,11 @@
 package com.styliste.service;
 
 import com.styliste.dto.*;
+import com.styliste.entity.Attribute;
 import com.styliste.entity.Product;
-import com.styliste.entity.ProductAttribute;
 import com.styliste.exception.BadRequestException;
 import com.styliste.exception.ResourceNotFoundException;
+import com.styliste.repository.AttributeRepository;
 import com.styliste.repository.ProductRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,7 +16,9 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -25,6 +28,10 @@ public class ProductService {
 
     @Autowired
     private ProductRepository productRepository;
+
+    @Autowired
+    private AttributeRepository attributeRepository;
+
 
     public ProductDTO createProduct(CreateProductRequest request) {
         log.info("Creating product: {}", request.getName());
@@ -44,13 +51,49 @@ public class ProductService {
                 .subcategory(request.getSubcategory())
                 .images(request.getImages())
                 .videos(request.getVideos())
-                .attributes(mapAttributeDTOsToEntities(request.getAttributes()))
-                .isActive(true)
+                .attributes(request.getAttributes() != null ? syncAttributes(request.getAttributes()) : new ArrayList<>())                .isActive(true)
                 .build();
 
         Product savedProduct = productRepository.save(product);
         log.info("Product created with ID: {}", savedProduct.getId());
         return mapToDTO(savedProduct);
+    }
+
+    public Map<String, List<String>> getProductFilters() {
+        log.info("Fetching all active product filters");
+        List<Attribute> allAttributes = attributeRepository.findAll();
+
+        // Grouping: { "COLOR": ["Red", "Blue"], "SIZE": ["M", "L"] }
+        return allAttributes.stream()
+                .collect(Collectors.groupingBy(
+                        Attribute::getType,
+                        Collectors.mapping(Attribute::getValue, Collectors.toList())
+                ));
+    }
+
+    private List<Attribute> syncAttributes(List<ProductAttributeDTO> dtos) {
+        if (dtos == null) return new ArrayList<>();
+        return dtos.stream().map(dto -> {
+            // Check if this Color/Size combination already exists in our master table
+            return attributeRepository.findByTypeAndValue(dto.getType(), dto.getValue())
+                    .orElseGet(() -> attributeRepository.save(
+                            Attribute.builder()
+                                    .type(dto.getType())
+                                    .value(dto.getValue())
+                                    .build()
+                    ));
+        }).collect(Collectors.toList());
+    }
+    private void cleanupOrphanAttributes(List<Attribute> attributesToCheck) {
+        if (attributesToCheck == null) return;
+        for (Attribute attr : attributesToCheck) {
+            // Check if any product is still using this attribute
+            long count = attributeRepository.countProductsUsingAttribute(attr.getId());
+            if (count == 0) {
+                log.info("Deleting unused attribute: {} - {}", attr.getType(), attr.getValue());
+                attributeRepository.delete(attr);
+            }
+        }
     }
 
     public ProductDTO getProductById(Long id) {
@@ -59,12 +102,14 @@ public class ProductService {
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found with ID: " + id));
         return mapToDTO(product);
     }
-
     public ProductDTO updateProduct(Long id, UpdateProductRequest request) {
         log.info("Updating product with ID: {}", id);
 
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found with ID: " + id));
+
+        // Keep track of old attributes to check for orphans later
+        List<Attribute> oldAttributes = new ArrayList<>(product.getAttributes());
 
         if (request.getName() != null) product.setName(request.getName());
         if (request.getDescription() != null) product.setDescription(request.getDescription());
@@ -75,25 +120,34 @@ public class ProductService {
         if (request.getSubcategory() != null) product.setSubcategory(request.getSubcategory());
         if (request.getImages() != null) product.setImages(request.getImages());
         if (request.getVideos() != null) product.setVideos(request.getVideos());
-        if (request.getAttributes() != null)
-            product.setAttributes(mapAttributeDTOsToEntities(request.getAttributes()));
+
+        // Update attributes if provided
+        if (request.getAttributes() != null) {
+            product.setAttributes(syncAttributes(request.getAttributes()));
+        }
+
         if (request.getIsActive() != null) product.setIsActive(request.getIsActive());
 
         Product updatedProduct = productRepository.save(product);
+
+        // After saving, check if any of the old attributes are now "orphans"
+        cleanupOrphanAttributes(oldAttributes);
+
         log.info("Product updated successfully");
         return mapToDTO(updatedProduct);
     }
-
     public void deleteProduct(Long id) {
-        log.info("Deleting product with ID: {}", id);
-
         Product product = productRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Product not found with ID: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found"));
+
+        // Capture the attributes before deleting the product
+        List<Attribute> attributesToClean = new ArrayList<>(product.getAttributes());
 
         productRepository.delete(product);
-        log.info("Product deleted successfully");
-    }
 
+        // Check if any of those attributes are now "orphans"
+        cleanupOrphanAttributes(attributesToClean);
+    }
     public void softDeleteProduct(Long id) {
         log.info("Soft deleting product with ID: {}", id);
 
@@ -182,8 +236,8 @@ public class ProductService {
                 .build();
     }
 
-    private List<ProductAttributeDTO> mapEntitiesToAttributeDTOs(List<ProductAttribute> attributes) {
-        if (attributes == null) return null;
+    private List<ProductAttributeDTO> mapEntitiesToAttributeDTOs(List<Attribute> attributes) {
+        if (attributes == null) return new ArrayList<>();
         return attributes.stream()
                 .map(attr -> ProductAttributeDTO.builder()
                         .type(attr.getType())
@@ -192,10 +246,4 @@ public class ProductService {
                 .collect(Collectors.toList());
     }
 
-    private List<ProductAttribute> mapAttributeDTOsToEntities(List<ProductAttributeDTO> dtos) {
-        if (dtos == null) return null;
-        return dtos.stream()
-                .map(dto -> new ProductAttribute(dto.getType(), dto.getValue()))
-                .collect(Collectors.toList());
-    }
 }

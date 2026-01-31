@@ -3,10 +3,14 @@ package com.styliste.service;
 import com.styliste.dto.AuthRequest;
 import com.styliste.dto.AuthResponse;
 import com.styliste.dto.SignUpRequest;
+import com.styliste.entity.PasswordReset;
 import com.styliste.entity.User;
 import com.styliste.entity.UserRole;
+import com.styliste.exception.BadRequestException;
 import com.styliste.exception.ResourceAlreadyExistsException;
+import com.styliste.exception.ResourceNotFoundException;
 import com.styliste.repository.AppointmentRepository;
+import com.styliste.repository.PasswordResetRepository;
 import com.styliste.repository.UserRepository;
 import com.styliste.security.JwtTokenProvider;
 import lombok.extern.slf4j.Slf4j;
@@ -19,6 +23,9 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.util.Random;
 
 @Slf4j
 @Service
@@ -36,6 +43,12 @@ public class AuthService {
 
     @Autowired
     private AppointmentService appointmentService;
+
+    @Autowired
+    private EmailService emailService;
+
+    @Autowired
+    private PasswordResetRepository passwordResetRepository;
 
     @Value("${jwt.secret}")
     private String debugSecretKey;
@@ -144,5 +157,55 @@ public class AuthService {
                 .role(savedUser.getRole().name())
                 .message("Signup successful")
                 .build();
+    }
+    public void sendOtp(String email) {
+        // 1. Verify user exists
+        userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("Email not registered with us."));
+
+        // 2. Generate 6-digit OTP
+        String otp = String.format("%06d", new Random().nextInt(999999));
+
+        // 3. Save to PasswordReset table
+        passwordResetRepository.deleteByEmail(email);
+        PasswordReset resetRequest = PasswordReset.builder()
+                .email(email)
+                .otp(otp)
+                .expiryTime(LocalDateTime.now().plusMinutes(10))
+                .verified(false)
+                .build();
+        passwordResetRepository.save(resetRequest);
+
+        // 4. Send Email using the new service
+        emailService.sendPasswordResetOtpEmail(email, otp);
+    }
+
+    public void verifyOtp(String email, String otp) {
+        PasswordReset reset = passwordResetRepository.findByEmailAndOtp(email, otp)
+                .orElseThrow(() -> new BadRequestException("Invalid OTP."));
+
+        if (reset.getExpiryTime().isBefore(LocalDateTime.now())) {
+            throw new BadRequestException("OTP has expired.");
+        }
+
+        reset.setVerified(true);
+        passwordResetRepository.save(reset);
+    }
+
+    public void resetPassword(String email, String newPassword) {
+        PasswordReset reset = passwordResetRepository.findTopByEmailOrderByExpiryTimeDesc(email)
+                .orElseThrow(() -> new BadRequestException("No reset request found."));
+
+        if (!reset.isVerified()) {
+            throw new BadRequestException("Please verify your OTP first.");
+        }
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found."));
+
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+
+        passwordResetRepository.deleteByEmail(email);
     }
 }

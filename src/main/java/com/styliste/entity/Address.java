@@ -39,4 +39,7 @@ public class Address {
 
     @Column(nullable = false)
     private Boolean isDefault = false;
+
+    @Column(nullable = false, length = 20)
+    private String contactPhone; // 👈 Add this for delivery purposes
 }

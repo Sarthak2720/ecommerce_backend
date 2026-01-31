@@ -21,4 +21,6 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     Optional<Order> findByTrackingNumber(String trackingNumber);
 
     long countByStatus(OrderStatus status);
+    Optional<Order> findByRazorpayOrderId(String razorpayOrderId);
+
 }

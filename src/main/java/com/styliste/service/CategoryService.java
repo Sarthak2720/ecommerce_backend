@@ -5,6 +5,7 @@ import com.styliste.entity.SubCategory;
 import com.styliste.exception.BadRequestException;
 import com.styliste.exception.ResourceAlreadyExistsException;
 import com.styliste.repository.CategoryRepository;
+import com.styliste.repository.ProductRepository;
 import com.styliste.repository.SubCategoryRepository;
 import com.styliste.exception.ResourceNotFoundException; // Assuming you have this
 import lombok.RequiredArgsConstructor;
@@ -20,6 +21,7 @@ public class CategoryService {
 
     private final CategoryRepository categoryRepository;
     private final SubCategoryRepository subCategoryRepository;
+    private final ProductRepository productRepository;
 
     // --- CATEGORY OPERATIONS ---
 
@@ -107,10 +109,22 @@ public class CategoryService {
     }
 
     public void deleteSubCategory(Long subId) {
-        if (!subCategoryRepository.existsById(subId)) {
-            throw new ResourceNotFoundException("Sub-category not found.");
+        // 1. Find the sub-category first to get its name
+        SubCategory subCategory = subCategoryRepository.findById(subId)
+                .orElseThrow(() -> new ResourceNotFoundException("Sub-category not found."));
+
+        // 2. Check if any products are using this sub-category
+        // We check by name because the Product entity stores subcategory as a String
+        boolean hasProducts = productRepository.existsBySubcategory(subCategory.getName());
+
+        if (hasProducts) {
+            // 3. Throw the specific error message for the frontend to display
+            throw new BadRequestException("Cannot delete sub-category '" + subCategory.getName() +
+                    "'. There are existing products associated with it.");
         }
-        subCategoryRepository.deleteById(subId);
+
+        // 4. If no products, proceed with deletion
+        subCategoryRepository.delete(subCategory);
     }
 
 }

@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 @Entity
@@ -21,6 +22,9 @@ public class Order {
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
+
+    @Column(length = 20)
+    private String userPhone; // 👈 Add this field to store the delivery contact number
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -66,6 +70,36 @@ public class Order {
     @PreUpdate
     public void preUpdate() {
         this.updatedAt = LocalDateTime.now();
+    }
+
+    @Column(name = "razorpay_order_id")
+    private String razorpayOrderId;
+
+    @Column(name = "razorpay_payment_id")
+    private String razorpayPaymentId;
+
+    @Column(name = "razorpay_signature")
+    private String razorpaySignature;
+
+
+    // Inside Order.java
+    @Builder.Default
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("timestamp ASC") // Ensures timeline is always in chronological order
+    private List<OrderTimeline> timeline = new ArrayList<>();
+
+    // Helper method to add timeline entries
+    public void addTimelineStep(OrderStatus status, String message) {
+        if (this.timeline == null) {
+            this.timeline = new ArrayList<>(); // Extra safety check
+        }
+        OrderTimeline step = OrderTimeline.builder()
+                .order(this)
+                .status(status)
+                .message(message)
+                .build();
+        this.timeline.add(step);
+        this.setStatus(status); // Sync the main status
     }
 }
 

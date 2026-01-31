@@ -65,18 +65,20 @@ public class SecurityConfiguration {
                 .exceptionHandling(exception -> exception.authenticationEntryPoint(jwtAuthenticationEntryPoint))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authz -> authz
+                        .dispatcherTypeMatchers(jakarta.servlet.DispatcherType.FORWARD).permitAll()
                         // 1. Static Resources (Standard paths)
                         .requestMatchers("/", "/index.html", "/*.js", "/*.css", "/*.json", "/*.png", "/favicon.ico", "/assets/**", "/static/**", "/uploads/**").permitAll()
 
                         // 2. SPA Navigation Routes (No regex here to prevent crashes)
                         // Instead of /**/, permit specific top-level SPA entry points
-                        .requestMatchers("/admin/**", "/user/**", "/shop/**", "/login", "/signup", "/appointment/**").permitAll()
+                        .requestMatchers("/admin/**", "/user/**", "/shop/**", "/login", "/signup", "/appointment/**","/products/**","/about/**","/services","/contact/**","/testimonials/**").permitAll()
 
                         // 3. Public APIs
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/products/**", "/api/categories/**", "/api/appointments/types", "/api/appointments/available-slots").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/products/search").permitAll()
                         .requestMatchers("/api/appointments/guest").permitAll()
+                        .requestMatchers("/api/contact/**").permitAll()
 
                         // 4. Secured APIs
                         .anyRequest().authenticated()

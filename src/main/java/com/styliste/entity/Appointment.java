@@ -106,6 +106,8 @@ public class Appointment {
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
     }
+    @Column(name = "cancelled_by")
+    private String cancelledBy;
 
     @PreUpdate
     public void preUpdate() {

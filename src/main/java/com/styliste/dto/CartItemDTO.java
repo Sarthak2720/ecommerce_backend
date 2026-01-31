@@ -1,22 +1,22 @@
 package com.styliste.dto;
 
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Positive;
 import lombok.*;
+import java.math.BigDecimal;
 
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 public class CartItemDTO {
-
-    @NotNull(message = "Product ID cannot be null")
-    private Long productId;
-
-    @NotNull(message = "Quantity cannot be null")
-    @Positive(message = "Quantity must be positive")
+    private Long id;            // CartItem ID (null for guest items)
+    private Long productId;     // Required for merging
+    private String productName;  // For UI display
+    private String productImage; // First image URL for UI
     private Integer quantity;
-
+    private BigDecimal unitPrice;
+    private BigDecimal totalPrice;
+    private boolean isSoldOut;         // 👈 Flag for 0 stock
     private String selectedSize;
     private String selectedColor;
+    private boolean isQuantityAdjusted; // 👈 Add this
 }

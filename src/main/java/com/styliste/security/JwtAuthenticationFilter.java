@@ -31,10 +31,27 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             String requestURI = request.getRequestURI();
 
             // Skip logging for public static files to keep console clean
-            if (!requestURI.contains("/api/")) {
-                filterChain.doFilter(request, response);
-                return;
+            if (requestURI.contains("/api/")) {
+                try {
+                    System.out.println("--- API FILTER START: " + requestURI + " ---");
+                    String jwt = getJwtFromRequest(request);
+
+                    if (StringUtils.hasText(jwt) && tokenProvider.validateToken(jwt)) {
+                        String username = tokenProvider.getUsernameFromJwt(jwt);
+                        var userDetails = userDetailsService.loadUserByUsername(username);
+
+                        UsernamePasswordAuthenticationToken authentication =
+                                new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+
+                        authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                        SecurityContextHolder.getContext().setAuthentication(authentication);
+                        System.out.println("Security Context Set for: " + username);
+                    }
+                } catch (Exception ex) {
+                    log.error("Could not set user authentication: {}", ex.getMessage());
+                }
             }
+
 
             System.out.println("--- FILTER START: " + requestURI + " ---");
 

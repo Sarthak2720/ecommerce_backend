@@ -13,4 +13,5 @@ public class UpdateOrderStatusRequest {
     private String status;
 
     private String trackingNumber;
+    private String timelineMessage; // 👈 Allow admin to type: "Packed and ready to go!"
 }

@@ -12,6 +12,9 @@ import java.util.List;
 public class OrderDTO {
     private Long id;
     private Long userId;
+    private String userName;
+    private String userEmail;
+    private String userPhone;
     private String status;
     private String paymentStatus;
     private BigDecimal totalAmount;
@@ -22,4 +25,5 @@ public class OrderDTO {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private List<OrderItemDTO> items;
+    private List<OrderTimelineDTO> timeline; // 👈 Array for the UI Stepper
 }
