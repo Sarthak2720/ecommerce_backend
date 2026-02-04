@@ -43,6 +43,8 @@ public class UserController {
         return ResponseEntity.ok(userService.updateProfile(id, dto));
     }
 
+    @PutMapping("/{id}/addresses/")
+
     @PostMapping("/{id}/change-password")
     public ResponseEntity<String> changePassword(@PathVariable Long id, @RequestBody Map<String, String> payload) {
         userService.updatePassword(id, payload.get("oldPassword"), payload.get("newPassword"));
@@ -66,6 +68,30 @@ public class UserController {
         userService.setDefaultAddress(id, addressId);
         return ResponseEntity.noContent().build();
     }
+
+    // 7. Update Existing Address
+    @PutMapping("/{id}/addresses/{addrId}")
+    public ResponseEntity<AddressDTO> updateAddress(
+            @PathVariable Long id,
+            @PathVariable Long addrId,
+            @RequestBody AddressDTO dto
+    ) {
+        return ResponseEntity.ok(
+                userService.updateAddress(id, addrId, dto)
+        );
+    }
+
+    // 8. Delete Address
+    @DeleteMapping("/{id}/addresses/{addrId}")
+    public ResponseEntity<Void> deleteAddress(
+            @PathVariable Long id,
+            @PathVariable Long addrId
+    ) {
+        userService.deleteAddress(id, addrId);
+        return ResponseEntity.noContent().build();
+    }
+
+
 
     // Endpoint to ACTIVATE a user
     @PatchMapping("/{id}/activate")

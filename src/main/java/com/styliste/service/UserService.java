@@ -68,6 +68,45 @@ private AddressRepository addressRepository;
         return user.getAddresses().stream().map(this::mapAddressToDTO).toList();
     }
 
+    public AddressDTO updateAddress(Long userId, Long addrId, AddressDTO dto) {
+
+        Address address = addressRepository
+                .findByIdAndUserId(addrId, userId)
+                .orElseThrow(() -> new RuntimeException("Address not found"));
+
+        // Update fields
+        address.setAddressLine1(dto.getAddressLine1());
+        address.setAddressLine2(dto.getAddressLine2());
+        address.setCity(dto.getCity());
+        address.setState(dto.getState());
+        address.setPostalCode(dto.getPostalCode());
+        address.setCountry(dto.getCountry());
+        address.setContactPhone(dto.getContactPhone());
+
+        // 🚫 Do NOT change default flag here
+        // Default address must be controlled only by PATCH /default
+
+        Address saved = addressRepository.save(address);
+
+        return mapAddressToDTO(saved);
+    }
+
+    public void deleteAddress(Long userId, Long addrId) {
+
+        Address address = addressRepository
+                .findByIdAndUserId(addrId, userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Address not found"));
+        try {
+            addressRepository.delete(address);
+            addressRepository.flush(); // 👈 force DB execution NOW
+        } catch (Exception e) {
+            log.error("Delete address failed", e);
+            throw e;
+        }
+    }
+
+
+
     public AddressDTO addAddress(Long userId, AddressDTO dto) {
         User user = userRepository.findById(userId).orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
