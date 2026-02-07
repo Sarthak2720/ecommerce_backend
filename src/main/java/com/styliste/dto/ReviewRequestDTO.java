@@ -12,6 +12,7 @@ public class ReviewRequestDTO {
     private String title;
     private String body;
 //    private List<MediaDTO> media; // List of URLs
+private List<Long> mediaIdsToDelete;
 
     @Data
     public static class MediaDTO {

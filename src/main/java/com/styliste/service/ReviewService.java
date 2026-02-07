@@ -4,7 +4,9 @@ import com.styliste.dto.ReviewRequestDTO;
 import com.styliste.dto.ReviewResponseDTO;
 import com.styliste.entity.Review;
 import com.styliste.entity.ReviewMedia;
+import com.styliste.entity.User;
 import com.styliste.repository.ReviewRepository;
+import com.styliste.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -12,8 +14,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -21,6 +26,9 @@ public class ReviewService {
 
     @Autowired
     private ReviewRepository reviewRepository;
+
+    @Autowired
+    private UserRepository userRepository; // Inject this
 
     @Autowired
     private FileStorageService fileStorageService; // Inject your service
@@ -82,14 +90,113 @@ public class ReviewService {
         // 4. Save to DB
         Review savedReview = reviewRepository.save(review);
 
-        return mapToResponse(savedReview);
+        String reviewerName = userRepository.findById(request.getUserId())
+                .map(User::getName)
+                .orElse("Anonymous");
+
+        // 6. Return with BOTH arguments
+        return mapToResponse(savedReview, reviewerName);
+    }
+
+    @Transactional
+    public ReviewResponseDTO updateReview(Long reviewId,
+                                          ReviewRequestDTO request,
+                                          List<MultipartFile> newImages,
+                                          List<MultipartFile> newVideos) {
+
+        // 1. Fetch existing review
+        Review review = reviewRepository.findById(reviewId)
+                .orElseThrow(() -> new RuntimeException("Review not found"));
+
+        // 2. Validation: Ensure the user editing owns the review
+        if (!review.getUserId().equals(request.getUserId())) {
+            throw new RuntimeException("You are not authorized to edit this review");
+        }
+
+        // 3. Update Text Fields (only if provided)
+        if (request.getRating() != null) review.setRating(request.getRating());
+        if (request.getTitle() != null) review.setTitle(request.getTitle());
+        if (request.getBody() != null) review.setBody(request.getBody());
+
+        // Update the timestamp
+        review.setUpdatedAt(LocalDateTime.now());
+
+        // 4. Handle Media Deletion (Removing old photos)
+        if (request.getMediaIdsToDelete() != null && !request.getMediaIdsToDelete().isEmpty()) {
+            review.getMedia().removeIf(media -> {
+                if (request.getMediaIdsToDelete().contains(media.getId())) {
+
+                    return true; // Remove from list
+
+                }
+                return false;
+            });
+        }
+
+        // 5. Handle New Media Uploads (Appending new photos/videos)
+        List<ReviewMedia> mediaList = review.getMedia(); // Get existing list
+
+        // Add New Images
+        if (newImages != null && !newImages.isEmpty()) {
+            for (MultipartFile file : newImages) {
+                if (!file.isEmpty()) {
+                    String path = fileStorageService.saveFile(file, "image");
+                    mediaList.add(ReviewMedia.builder()
+                            .review(review)
+                            .mediaType(ReviewMedia.MediaType.IMAGE)
+                            .url(path)
+                            .build());
+                }
+            }
+        }
+
+        // Add New Videos
+        if (newVideos != null && !newVideos.isEmpty()) {
+            for (MultipartFile file : newVideos) {
+                if (!file.isEmpty()) {
+                    String path = fileStorageService.saveFile(file, "video");
+                    mediaList.add(ReviewMedia.builder()
+                            .review(review)
+                            .mediaType(ReviewMedia.MediaType.VIDEO)
+                            .url(path)
+                            .build());
+                }
+            }
+        }
+
+        // 6. Save and Return
+        Review updatedReview = reviewRepository.save(review);
+        String reviewerName = userRepository.findById(updatedReview.getUserId())
+                .map(User::getName)
+                .orElse("Anonymous");
+
+        // 8. Return with BOTH arguments
+        return mapToResponse(updatedReview, reviewerName);
     }
 
     @Transactional(readOnly = true)
     public Page<ReviewResponseDTO> getProductReviews(Long productId, Pageable pageable) {
-        // Fetch only active reviews
-        return reviewRepository.findByProductIdAndIsDeletedFalse(productId, pageable)
-                .map(this::mapToResponse);
+        // 1. Fetch the page of reviews
+        Page<Review> reviewPage = reviewRepository.findByProductIdAndIsDeletedFalse(productId, pageable);
+
+        // 2. Extract all User IDs from these reviews
+        Set<Long> userIds = reviewPage.getContent().stream()
+                .map(Review::getUserId)
+                .collect(Collectors.toSet());
+
+        // 3. Fetch all names in ONE query (Bulk Fetch)
+        // Map<UserId, FullName>
+        Map<Long, String> userNames = userRepository.findAllById(userIds).stream()
+                .collect(Collectors.toMap(
+                        User::getId,
+                        User::getName
+                ));
+
+        // 4. Map the reviews, passing the looked-up name
+        return reviewPage.map(review -> {
+            String name = userNames.getOrDefault(review.getUserId(), "Anonymous User");
+            return mapToResponse(review, name);
+        });
     }
 
     @Transactional
@@ -102,7 +209,7 @@ public class ReviewService {
     }
 
     // Helper: Map Entity to DTO
-    private ReviewResponseDTO mapToResponse(Review review) {
+    private ReviewResponseDTO mapToResponse(Review review, String reviewerName) {
         List<String> imgUrls = new ArrayList<>();
         List<String> vidUrls = new ArrayList<>();
 
@@ -115,6 +222,9 @@ public class ReviewService {
                 .id(review.getId())
                 .title(review.getTitle())
                 .body(review.getBody())
+                .username(reviewerName) // Use the passed string, not the Long ID
+                .userId(review.getUserId())
+                .orderId(review.getOrderId())
                 .rating(review.getRating())
                 .createdAt(review.getCreatedAt())
                 .imageUrls(imgUrls)

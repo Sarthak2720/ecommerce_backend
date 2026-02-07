@@ -31,6 +31,18 @@ public class ReviewController {
         return ResponseEntity.ok(reviewService.createReview(reviewDTO, images, videos));
     }
 
+
+    // PUT: Update an existing review
+    @PutMapping(value = "/{reviewId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ReviewResponseDTO> updateReview(
+            @PathVariable Long reviewId,
+            @RequestPart("review") ReviewRequestDTO reviewDTO,
+            @RequestPart(value = "images", required = false) List<MultipartFile> images,
+            @RequestPart(value = "videos", required = false) List<MultipartFile> videos
+    ) {
+        return ResponseEntity.ok(reviewService.updateReview(reviewId, reviewDTO, images, videos));
+    }
+
     // GET: Get reviews for a product (Pagination is built-in!)
     // Example: /api/reviews/product/101?page=0&size=10
     @GetMapping("/product/{productId}")
